@@ -8,6 +8,7 @@
 #include <GUIMenu.au3>
 #include <Memory.au3>
 #include <StaticConstants.au3>
+#include <WinAPIGdi.au3>
 #include <WinAPIMisc.au3>
 #include <WinAPIRes.au3>
 #include <WinAPISysWin.au3>
