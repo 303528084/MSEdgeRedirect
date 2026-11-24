@@ -1,0 +1,2 @@
+# 语言包为 UTF-16 LE，禁止 Git 做换行/编码转换
+*.lang -text

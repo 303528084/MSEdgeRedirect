@@ -37,6 +37,7 @@
 #include "Includes\_Security.au3"
 #include "Includes\_Settings.au3"
 #include "Includes\_Translation.au3"
+#include "Includes\_Localization.au3"
 #include "Includes\_URLModifications.au3"
 
 #include "Includes\Base64.au3"
@@ -141,7 +142,7 @@ Func CheckEdgeIntegrity($sLocation)
 					_Translate($aMUI[1], "Admin Rights Required"), _
 					_Translate($aMUI[1], "The IFEO junctions for MSEdgeRedirect are missing and need to be created. Create Now?"), _
 					0) = $IDYES Then ShellExecuteWait(@ScriptFullPath, "/repair", @ScriptDir, "RunAs")
-				If @error Then MsgBox($MB_ICONERROR+$MB_OK, _
+				If @error Then _MsgBox($MB_ICONERROR+$MB_OK, _
 					"Copy Failed", _
 					"Unable to create the IFEO junction without Admin Rights!")
 			Case Else
@@ -218,20 +219,20 @@ Func ProcessCMDLine()
 		Do
 			Switch $CmdLine[1]
 				Case "/?", "/help"
-					MsgBox(0, "Help and Flags", _
+					_MsgBox(0, "Help and Flags", _
 							"MSEdgeRedirect" & @CRLF & _
 							@CRLF & _
-							@TAB & "/admin    " & @TAB & "Attempts to run MSEdgeRedirect as admin" & @CRLF & _
-							@TAB & "/change   " & @TAB & "Reruns Installer" & @CRLF & _
-							@TAB & "/hide     " & @TAB & "Hides the tray icon" & @CRLF & _
-							@TAB & "/force    " & @TAB & "Skips Safety Checks" & @CRLF & _
-							@TAB & "/kill     " & @TAB & "Kills other MSEdgeRedirect processes" & @CRLF & _
-							@TAB & "/portable " & @TAB & "Runs MSEdgeRedirect in portable mode" & @CRLF & _
-							@TAB & "/repair   " & @TAB & "Repairs IFEO directory junctions" & @CRLF & _
-							@TAB & "/settings " & @TAB & "Opens Settings Menu" & @CRLF & _
-							@TAB & "/si       " & @TAB & "Runs a Silent Install" & @CRLF & _
-							@TAB & "/update   " & @TAB & "Downloads the latest RELEASE (default) or DEV build" & @CRLF & _
-							@TAB & "/uninstall" & @TAB & "Uninstalls MSEdgeRedirect" & @CRLF & _
+							@TAB & "/admin    " & @TAB & _L("Attempts to run MSEdgeRedirect as admin") & @CRLF & _
+							@TAB & "/change   " & @TAB & _L("Reruns Installer") & @CRLF & _
+							@TAB & "/hide     " & @TAB & _L("Hides the tray icon") & @CRLF & _
+							@TAB & "/force    " & @TAB & _L("Skips Safety Checks") & @CRLF & _
+							@TAB & "/kill     " & @TAB & _L("Kills other MSEdgeRedirect processes") & @CRLF & _
+							@TAB & "/portable " & @TAB & _L("Runs MSEdgeRedirect in portable mode") & @CRLF & _
+							@TAB & "/repair   " & @TAB & _L("Repairs IFEO directory junctions") & @CRLF & _
+							@TAB & "/settings " & @TAB & _L("Opens Settings Menu") & @CRLF & _
+							@TAB & "/si       " & @TAB & _L("Runs a Silent Install") & @CRLF & _
+							@TAB & "/update   " & @TAB & _L("Downloads the latest RELEASE (default) or DEV build") & @CRLF & _
+							@TAB & "/uninstall" & @TAB & _L("Uninstalls MSEdgeRedirect") & @CRLF & _
 							@CRLF & _
 							@CRLF)
 					Exit 0
@@ -247,7 +248,7 @@ Func ProcessCMDLine()
 					Exit
 				Case "/ContinueActive"
 					If Not $bIsAdmin Then
-						MsgBox($MB_ICONERROR+$MB_OK, _
+						_MsgBox($MB_ICONERROR+$MB_OK, _
 							"Admin Required", _
 							"Unable to install Active Mode without Admin Rights!")
 						FileWrite($hLogs[$AppFailures], _NowCalc() & " - " & "Active Mode UAC Elevation Attempt Failed!" & @CRLF)
@@ -258,7 +259,7 @@ Func ProcessCMDLine()
 				Case "/ContinueEurope", "/SetEurope"
 					Select
 						Case Not $bIsAdmin
-							MsgBox($MB_ICONERROR+$MB_OK, _
+							_MsgBox($MB_ICONERROR+$MB_OK, _
 								"Admin Required", _
 								"Unable to Setup Europe Mode without Admin Rights!")
 							FileWrite($hLogs[$AppFailures], _NowCalc() & " - " & "Europe Mode UAC Elevation Attempt Failed!" & @CRLF)
@@ -266,7 +267,7 @@ Func ProcessCMDLine()
 						Case Not RegRead("HKLM\SYSTEM\CurrentControlSet\Services\UCPD", "Start") = 4
 							ContinueCase
 						Case Not RegRead("HKLM\SYSTEM\CurrentControlSet\Services\UCPD", "FeatureV2") = 2
-							If MsgBox($MB_YESNO + $MB_ICONWARNING + $MB_TOPMOST, _
+							If _MsgBox($MB_YESNO + $MB_ICONWARNING + $MB_TOPMOST, _
 								"Reboot Required", _
 								"A Reboot/Restart is required to disable User Choice Protection Driver (UCPD), would you like to do so now?") = $IDYES Then
 								RegWrite("HKLM\SYSTEM\CurrentControlSet\Services\UCPD", "Start", "REG_DWORD", 4)
@@ -322,9 +323,9 @@ Func ProcessCMDLine()
 						Case StringLeft($CmdLine[2], 1) = "/"
 							_ArrayDelete($CmdLine, 1)
 						Case Else
-							MsgBox(0, _
+							_MsgBox(0, _
 								"Invalid", _
-								'Invalid file - "' & $CmdLine[2] & @CRLF)
+								_L("Invalid file") & ' - "' & $CmdLine[2] & @CRLF)
 							Exit 87 ; ERROR_INVALID_PARAMETER
 					EndSelect
 				#cs
@@ -364,9 +365,9 @@ Func ProcessCMDLine()
 				Case Else
 					FileWrite($hLogs[$PEBIAT], _NowCalc() & " - " & "Unexpected Commandline: " & _ArrayToString($CmdLine) & @CRLF)
 					If @Compiled Then ; support for running non-compiled script - mLipok
-						MsgBox(0, _
+						_MsgBox(0, _
 							"Invalid", _
-							'Invalid parameter - "' & $CmdLine[1] & '".' & @CRLF)
+							_L("Invalid parameter") & ' - "' & $CmdLine[1] & '".' & @CRLF)
 						Exit 87 ; ERROR_INVALID_PARAMETER
 					EndIf
 			EndSwitch
@@ -395,7 +396,7 @@ Func ProcessCMDLine()
 					Case StringInStr($aInstall[1], "HKLM") And Not $bIsAdmin And @Compiled; Installed, Active Mode, Not Admin
 						ShellExecute(@ScriptFullPath, $sCMDLine, @ScriptDir, "RunAs")
 						If @error Then
-							If Not $bSilent Then MsgBox($MB_ICONWARNING+$MB_OK, _
+							If Not $bSilent Then _MsgBox($MB_ICONWARNING+$MB_OK, _
 								"Existing Active Mode Install", _
 								"Unable to update an existing Active Mode install without Admin Rights! The installer will continue however.")
 							ContinueCase
@@ -421,7 +422,7 @@ Func ProcessCMDLine()
 			Case StringInStr($aInstall[1], "HKLM") And Not $bIsAdmin ; Installed, Up to Date, Active Mode, Not Admin
 				ShellExecute(@ScriptFullPath, $sCMDLine, @ScriptDir, "RunAs")
 				If @error Then
-					If Not $bSilent Then MsgBox($MB_ICONWARNING+$MB_OK, _
+					If Not $bSilent Then _MsgBox($MB_ICONWARNING+$MB_OK, _
 						"Existing Active Mode Install", _
 						"Unable to update an existing Active Mode install without Admin Rights! The installer will continue however.")
 					ContinueCase
@@ -451,11 +452,11 @@ Func ReactiveMode($bHide = False)
 	TrayCreateItem($sVersion)
 	TrayItemSetState(-1, $TRAY_DISABLE)
 	TrayCreateItem("")
-	Local $hSettings = TrayCreateItem("Settings")
-	Local $hDonate = TrayCreateItem("Donate")
+	Local $hSettings = TrayCreateItem(_L("Settings"))
+	Local $hDonate = TrayCreateItem(_L("Donate"))
 	TrayCreateItem("")
-	Local $hUpdate = TrayCreateItem("Check for Updates")
-	Local $hExit = TrayCreateItem("Exit")
+	Local $hUpdate = TrayCreateItem(_L("Check for Updates"))
+	Local $hExit = TrayCreateItem(_L("Exit"))
 
 	If $bHide Then TraySetState($TRAY_ICONSTATE_HIDE)
 
@@ -551,7 +552,7 @@ EndFunc
 Func RunArchCheck($bSilent = False)
 	If @Compiled And $bIsWOW64 Then
 		If Not $bSilent Then
-			MsgBox($MB_ICONERROR+$MB_OK, _
+			_MsgBox($MB_ICONERROR+$MB_OK, _
 				"Wrong Version", _
 				"The 64-bit Version of MSEdgeRedirect must be used with 64-bit Windows!")
 		EndIf
@@ -578,7 +579,7 @@ Func RunHTTPCheck($bSilent = False)
 	If StringInStr($aDefaults[$hMSEdge], "MSEdge") Then
 		If $aDefaults[$hHTTP] = $aDefaults[$hMSEdge] Or $aDefaults[$hHTTPS] = $aDefaults[$hMSEdge] Then
 			If Not $bSilent Then
-				MsgBox($MB_ICONERROR+$MB_OK, _
+				_MsgBox($MB_ICONERROR+$MB_OK, _
 					"Edge Set As Default", _
 					"You must set a different Default Browser to use MSEdgeRedirect! Once this is corrected, please relaunch MSEdgeRedirect.")
 			EndIf
