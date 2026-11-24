@@ -1,0 +1,208 @@
+name: zh-release
+
+on:
+  schedule:
+    - cron: '0 2 * * *'        # 每天 02:00 UTC = 北京 10:00
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        description: '上游 tag（留空=自动取上游最新正式 release）'
+        required: false
+        type: string
+      dry_run:
+        description: '只构建、不发布（用于验证 rebase 是否干净）'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+
+env:
+  UPSTREAM: rcmaehl/MSEdgeRedirect
+
+concurrency:
+  group: zh-release
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.r.outputs.tag }}
+      zh_tag: ${{ steps.r.outputs.zh_tag }}
+      exists: ${{ steps.r.outputs.exists }}
+      publish: ${{ steps.r.outputs.publish }}
+    steps:
+      - id: r
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TAG="${{ inputs.upstream_tag }}"
+          if [ -z "$TAG" ]; then
+            TAG=$(gh api "repos/$UPSTREAM/releases" \
+                  --jq '[.[] | select(.draft == false and .prerelease == false)][0].tag_name')
+          fi
+          if [ -z "$TAG" ] || [ "$TAG" = "null" ]; then
+            echo "无法确定上游 tag"; exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "zh_tag=zh-$TAG" >> "$GITHUB_OUTPUT"
+          if gh api "repos/${{ github.repository }}/releases/tags/zh-$TAG" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "已存在 zh-$TAG，跳过"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.exists == 'false'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: zh-CN
+          fetch-depth: 0
+
+      - name: Rebase onto upstream tag
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git remote add upstream "https://github.com/$env:UPSTREAM.git"
+          git fetch upstream --tags --force
+          git -c user.name="zh-CN builder" -c user.email="zh-cn@users.noreply.github.com" `
+              rebase "refs/tags/${{ needs.check.outputs.tag }}"
+          if ($LASTEXITCODE -ne 0) {
+            git rebase --abort
+            $body = @"
+          上游 tag `${{ needs.check.outputs.tag }}` 与本地化分支冲突，需手工 rebase。
+
+          本地复现：
+          ~~~bash
+          git fetch upstream --tags
+          git rebase refs/tags/${{ needs.check.outputs.tag }}
+          ~~~
+          本次未发布任何内容。
+          "@
+            gh issue create --title "zh-CN rebase 冲突：${{ needs.check.outputs.tag }}" --body $body
+            throw "rebase 冲突，停止发布"
+          }
+          git log -1 --oneline
+
+      - name: Cache tools
+        uses: actions/cache@v5
+        id: cache
+        with:
+          path: |
+            autoit-v3-setup.exe
+            SciTE4AutoIt3.exe
+            C:\Program Files (x86)\AutoIt3\SciTE\Au3Stripper
+          key: autoit-3.3.18
+
+      - name: Download tools
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          curl -sSfL https://www.autoitscript.com/cgi-bin/getfile.pl?autoit3/autoit-v3-setup.exe -o autoit-v3-setup.exe `
+            -sSfL https://www.autoitscript.com/cgi-bin/getfile.pl?../autoit3/scite/download/SciTE4AutoIt3.exe -o SciTE4AutoIt3.exe `
+            -sSfLO https://www.autoitscript.com/autoit3/scite/download/Au3Stripper.zip
+          Expand-Archive Au3Stripper.zip "${env:ProgramFiles(x86)}\AutoIt3\SciTE\Au3Stripper"
+
+      - name: Install tools
+        shell: pwsh
+        run: |
+          Start-Process autoit-v3-setup.exe -ArgumentList /S -NoNewWindow -Wait
+          Start-Process SciTE4AutoIt3.exe -ArgumentList /S -NoNewWindow -Wait
+
+      - name: Compile
+        shell: pwsh
+        run: |
+          Start-Process "${env:ProgramFiles(x86)}\AutoIt3\AutoIt3.exe" "`"${env:ProgramFiles(x86)}\AutoIt3\SciTE\AutoIt3Wrapper\AutoIt3Wrapper.au3`" /NoStatus /prod /in MSEdgeRedirect.au3" -NoNewWindow -Wait
+          if (-not (Test-Path MSEdgeRedirect.exe)) { throw "编译失败：未生成 MSEdgeRedirect.exe" }
+
+      - name: Localization coverage
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File Tools\check-lang.ps1 | Tee-Object -FilePath coverage.log
+          "共 $(Get-ChildItem MSEdgeRedirect*.exe | Measure-Object).Count 个 exe"
+
+      - name: Checksums and package
+        shell: pwsh
+        run: |
+          Get-ChildItem MSEdgeRedirect*.exe | ForEach-Object {
+            "{0}  *{1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
+          } | Set-Content checksums.sha256 -Encoding ascii
+          7z a MSEdgeRedirect_zh-CN.zip MSEdgeRedirect.exe MSEdgeRedirect_x86.exe checksums.sha256 Assets\Langs\0804.lang
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mser-zh-${{ needs.check.outputs.tag }}
+          path: |
+            MSEdgeRedirect*.exe
+            checksums.sha256
+            MSEdgeRedirect_zh-CN.zip
+          if-no-files-found: error
+
+      - name: Write release notes
+        shell: pwsh
+        run: |
+          $cov = (Get-Content coverage.log -Raw).Trim()
+          @"
+          ## MSEdgeRedirect ${{ needs.check.outputs.tag }} 简体中文版
+
+          对应上游正式版：https://github.com/$env:UPSTREAM/releases/tag/${{ needs.check.outputs.tag }}
+          构建基线：upstream tag ``${{ needs.check.outputs.tag }}`` + 本仓库 ``zh-CN`` 分支全部本地化改动
+
+          ### 包含
+          - ``MSEdgeRedirect.exe``（x64）/ ``MSEdgeRedirect_x86.exe``（x86），版本号与上游一致
+          - ``0804.lang`` 语言包（安装时自动嵌入，也可单独取用）
+          - ``checksums.sha256``
+          - ``MSEdgeRedirect_zh-CN.zip`` 打包版
+
+          ### 汉化范围
+          安装向导（模式/设置/许可/完成页）、托盘菜单、设置窗口、全部提示弹窗、``/help`` 说明。
+          按上游设计保留英文：日志文本、命令行开关名、下拉框的值（``Default``/``Custom``/``Google`` 等）、Edge 频道名、``IFEO``。
+
+          ### 翻译覆盖率
+          ~~~
+          $cov
+          ~~~
+
+          ### 说明
+          - 非官方构建，源码公开在本仓库 ``zh-CN`` 分支，遵循 LGPL-3.0
+          - 上游每次发新正式版，本仓库会在 24 小时内跟进同名 ``zh-<版本>`` release
+          "@ | Out-File release-notes.md -Encoding utf8
+
+      - name: Tag and push
+        if: needs.check.outputs.publish == 'true'
+        shell: pwsh
+        run: |
+          git -c user.name="zh-CN builder" -c user.email="zh-cn@users.noreply.github.com" `
+              tag -a "${{ needs.check.outputs.zh_tag }}" -m "zh-CN build of ${{ needs.check.outputs.tag }}"
+          git push origin "refs/tags/${{ needs.check.outputs.zh_tag }}"
+
+      - name: Create release
+        if: needs.check.outputs.publish == 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.check.outputs.zh_tag }}
+          name: MSEdgeRedirect ${{ needs.check.outputs.tag }} 简体中文
+          body_path: release-notes.md
+          files: |
+            MSEdgeRedirect.exe
+            MSEdgeRedirect_x86.exe
+            checksums.sha256
+            MSEdgeRedirect_zh-CN.zip
+            Assets/Langs/0804.lang
+          fail_on_unmatched_files: true
+          prerelease: false
