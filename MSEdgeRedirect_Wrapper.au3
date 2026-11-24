@@ -18,6 +18,7 @@
 #include "Includes\_Settings.au3"
 #include "Includes\_Countries.au3"
 #include "Includes\_Translation.au3"
+#include "Includes\_Localization.au3"
 
 #include "Includes\TaskScheduler.au3"
 
@@ -71,9 +72,9 @@ Func RunInstall(ByRef $aConfig, ByRef $aSettings, $bSilent = False)
 		If Not FileCopy(@ScriptFullPath, $sDrive & "\Program Files\MSEdgeRedirect\MSEdgeRedirect.exe", $FC_CREATEPATH+$FC_OVERWRITE) Then
 			FileWrite($hLogs[$Install], _NowCalc() & " - [CRITICAL] Unable to copy application to " & $sDrive & "'\Program Files\MSEdgeRedirect\MSEdgeRedirect.exe'" & @CRLF)
 			If Not $bSilent Then
-				MsgBox($MB_ICONERROR + $MB_OK, _
+				_MsgBox($MB_ICONERROR + $MB_OK, _
 					"[CRITICAL]", _
-					"Unable to copy application to " & $sDrive & "'\Program Files\MSEdgeRedirect\MSEdgeRedirect.exe'")
+					_L("Unable to copy application to") & " " & $sDrive & "'\Program Files\MSEdgeRedirect\MSEdgeRedirect.exe'")
 			EndIf
 			Exit 29 ; ERROR_WRITE_FAULT
 		EndIf
@@ -82,9 +83,9 @@ Func RunInstall(ByRef $aConfig, ByRef $aSettings, $bSilent = False)
 		If Not FileCopy(@ScriptFullPath, @LocalAppDataDir & "\MSEdgeRedirect\MSEdgeRedirect.exe", $FC_CREATEPATH+$FC_OVERWRITE) Then
 			FileWrite($hLogs[$Install], _NowCalc() & " - [CRITICAL] Unable to copy application to '" & @LocalAppDataDir & "\MSEdgeRedirect\MSEdgeRedirect.exe'" & @CRLF)
 			If Not $bSilent Then
-				MsgBox($MB_ICONERROR + $MB_OK, _
+				_MsgBox($MB_ICONERROR + $MB_OK, _
 					"[CRITICAL]", _
-					"Unable to copy application to '" & @LocalAppDataDir & "\MSEdgeRedirect\MSEdgeRedirect.exe'")
+					_L("Unable to copy application to") & " '" & @LocalAppDataDir & "\MSEdgeRedirect\MSEdgeRedirect.exe'")
 			EndIf
 			Exit 29 ; ERROR_WRITE_FAULT
 		EndIf
@@ -101,7 +102,7 @@ Func RunPDFCheck($bSilent = False)
 
 	If StringRegExp(RegRead("HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\UserChoice", "ProgId"), "(?i)(ms|microsoft)edge.*") Then
 		If Not $bSilent Then
-			MsgBox($MB_ICONERROR+$MB_OK, _
+			_MsgBox($MB_ICONERROR+$MB_OK, _
 				"Edge Set As Default PDF Handler", _
 				"You must set a different Default PDF Handler to use this feature!")
 		EndIf
@@ -390,7 +391,7 @@ Func RunSetup($bUpdate = False, $bSilent = False, $iPage = 0, $hSetupFile = @Scr
 		If @Compiled And Not _GetSettingValue("NoUpdates") Then RunUpdateCheck()
 
 		If StringInStr($bUpdate, "HKLM") And Not $bIsAdmin And Not @Compiled Then
-			MsgBox($MB_ICONERROR+$MB_OK, _
+			_MsgBox($MB_ICONERROR+$MB_OK, _
 				"Admin Required", _
 				"Unable to update an Admin Install without Admin Rights!")
 			FileWrite($hLogs[$AppFailures], _NowCalc() & " - " & "Non Admin Update Attempt on Admin Install. EXITING!" & @CRLF)
@@ -424,9 +425,9 @@ Func RunSetup($bUpdate = False, $bSilent = False, $iPage = 0, $hSetupFile = @Scr
 				GUICtrlSetState(-1, $GUI_DISABLE)
 			Case $iPage = $hSettings And $bResumed
 				If $bUpdate Then
-					GUICtrlSetData(-1, "Update")
+					GUICtrlSetData(-1, _L("Update"))
 				Else
-					GUICtrlSetData(-1, "Install")
+					GUICtrlSetData(-1, _L("Install"))
 				EndIf
 			Case $iPage = $hLicense
 				ContinueCase
@@ -434,7 +435,7 @@ Func RunSetup($bUpdate = False, $bSilent = False, $iPage = 0, $hSetupFile = @Scr
 				GUICtrlSetState(-1, $GUI_DISABLE)
 				ContinueCase	
 			Case $iPage = $hSettings
-				GUICtrlSetData(-1, "Save")
+				GUICtrlSetData(-1, _L("Save"))
 		EndSelect
 		Local $hCancel = GUICtrlCreateButton("Cancel", 530, 435, 90, 30)
 
@@ -748,6 +749,11 @@ Func RunSetup($bUpdate = False, $bSilent = False, $iPage = 0, $hSetupFile = @Scr
 		GUISwitch($hInstallGUI)
 		#EndRegion
 
+		_LocalizeGUI($hInstallGUI)
+		For $iLoop = 0 To UBound($aPages) - 1
+			If IsHWnd($aPages[$iLoop]) Then _LocalizePage($aPages[$iLoop])
+		Next
+
 		GUISetState(@SW_SHOW, $hInstallGUI)
 		GUISetState(@SW_SHOW, $aPages[$iPage])
 
@@ -788,12 +794,12 @@ Func RunSetup($bUpdate = False, $bSilent = False, $iPage = 0, $hSetupFile = @Scr
 							GUICtrlSetState($hBack, $GUI_DISABLE)
 							GUICtrlSetState($hNext, $GUI_ENABLE)
 						Case $hMode
-							GUICtrlSetData($hNext, "Next >")
+							GUICtrlSetData($hNext, _L("Next >"))
 						Case $hSettings
 							If $bUpdate Then
-								GUICtrlSetData($hNext, "Update")
+								GUICtrlSetData($hNext, _L("Update"))
 							Else
-								GUICtrlSetData($hNext, "Install")
+								GUICtrlSetData($hNext, _L("Install"))
 							EndIf
 					EndSwitch
 					GUISetState(@SW_HIDE, $aPages[$iPage])
@@ -822,9 +828,9 @@ Func RunSetup($bUpdate = False, $bSilent = False, $iPage = 0, $hSetupFile = @Scr
 								
 								EndSelect
 							ElseIf $bUpdate Then
-								GUICtrlSetData($hNext, "Update")
+								GUICtrlSetData($hNext, _L("Update"))
 							Else
-								GUICtrlSetData($hNext, "Install")
+								GUICtrlSetData($hNext, _L("Install"))
 							EndIf
 						Case $hFinish
 							If @Compiled Then
@@ -877,7 +883,7 @@ Func RunSetup($bUpdate = False, $bSilent = False, $iPage = 0, $hSetupFile = @Scr
 									SetIFEORegistry($aChannels)
 								EndIf
 								If $iMode = $hSettings Then Return
-								GUICtrlSetData($hNext, "Finish")
+								GUICtrlSetData($hNext, _L("Finish"))
 								GUICtrlSetState($hHelp, $GUI_DISABLE)
 								GUICtrlSetState($hBack, $GUI_DISABLE)
 								GUICtrlSetState($hCancel, $GUI_DISABLE)
@@ -906,7 +912,7 @@ Func RunSetup($bUpdate = False, $bSilent = False, $iPage = 0, $hSetupFile = @Scr
 								RegWrite("HKEY_CURRENT_USER\Control Panel\International\Geo", "Name", "REG_SZ", GUICtrlRead($aNew[3]))
 								RegWrite("HKEY_CURRENT_USER\Control Panel\International\Geo", "Nation", "REG_SZ", GUICtrlRead($aNew[4]))
 							EndIf
-							MsgBox($MB_OK + $MB_ICONINFORMATION + $MB_TOPMOST, "Reboot Required", "A Reboot/Restart is required to Complete the Regional Changes of Europe Mode.")
+							_MsgBox($MB_OK + $MB_ICONINFORMATION + $MB_TOPMOST, "Reboot Required", "A Reboot/Restart is required to Complete the Regional Changes of Europe Mode.")
 							Exit
 					EndSwitch
 					GUISetState(@SW_HIDE, $aPages[$iPage])
@@ -968,7 +974,7 @@ Func RunSetup($bUpdate = False, $bSilent = False, $iPage = 0, $hSetupFile = @Scr
 					EndIf
 
 				Case $hMsg = $hEngine And GUICtrlRead($hEngine) = "Custom"
-					$sEngine = InputBox("Enter Search Engine URL", "Enter the URL format of the custom Search Engine to use, including the %query% placeholder.", "https://duckduckgo.com/?q=%query%")
+					$sEngine = InputBox(_L("Enter Search Engine URL"), _L("Enter the URL format of the custom Search Engine to use, including the %query% placeholder."), "https://duckduckgo.com/?q=%query%")
 					If @error Then GUICtrlSetData($hEngine, "Google")
 
 				Case $hMsg = $hNoFeed
@@ -986,11 +992,11 @@ Func RunSetup($bUpdate = False, $bSilent = False, $iPage = 0, $hSetupFile = @Scr
 					EndIf
 
 				Case $hMsg = $hFeedSRC And GUICtrlRead($hFeedSRC) = "Custom"
-					$sFeedEng = InputBox("Enter Feed URL", "Enter the URL format of the custom Feed to use.", "https://news.google.com")
+					$sFeedEng = InputBox(_L("Enter Feed URL"), _L("Enter the URL format of the custom Feed to use."), "https://news.google.com")
 					If @error Then GUICtrlSetData($hFeedSRC, "Google")
 
 				Case $hMsg = $hImgSRC And GUICtrlRead($hImgSRC) = "Custom"
-					$sImgEng = InputBox("Enter Image Search Engine URL", "Enter the URL format of the custom Image Search Engine to use, including the %query% placeholder.", "https://duckduckgo.com/?ia=images&iax=images&q=%query%")
+					$sImgEng = InputBox(_L("Enter Image Search Engine URL"), _L("Enter the URL format of the custom Image Search Engine to use, including the %query% placeholder."), "https://duckduckgo.com/?ia=images&iax=images&q=%query%")
 					If @error Then GUICtrlSetData($hImgSRC, "Google")
 
 				Case $hMsg = $hNoMSN
@@ -1001,7 +1007,7 @@ Func RunSetup($bUpdate = False, $bSilent = False, $iPage = 0, $hSetupFile = @Scr
 					EndIf
 
 				Case $hMsg = $hWeather And GUICtrlRead($hWeather) = "Custom"
-					$sWeatherEng = InputBox("Enter Weather Engine URL", "Enter the URL format of the custom Weather Engine to use, including the %lat%, %long%, and (optionally) %locale% placeholders.", "https://www.accuweather.com/en/search-locations?query=")
+					$sWeatherEng = InputBox(_L("Enter Weather Engine URL"), _L("Enter the URL format of the custom Weather Engine to use, including the %lat%, %long%, and (optionally) %locale% placeholders."), "https://www.accuweather.com/en/search-locations?query=")
 					If @error Then GUICtrlSetData($hImgSRC, "Weather.com")
 
 				Case $hMsg = $hNoNews
@@ -1024,7 +1030,7 @@ Func RunSetup($bUpdate = False, $bSilent = False, $iPage = 0, $hSetupFile = @Scr
 							If Not RunPDFCheck($bSilent) Then SetError(1)
 							$sHandler = "Default"
 						Case "Custom"
-							$sHandler = FileOpenDialog("Select a PDF Handler", @ProgramFilesDir, "Executables (*.exe)", $FD_FILEMUSTEXIST)
+							$sHandler = FileOpenDialog(_L("Select a PDF Handler"), @ProgramFilesDir, _L("Executables (*.exe)"), $FD_FILEMUSTEXIST)
 					EndSwitch
 					If @error Then
 						GUICtrlSetState($hNoPDFs, $GUI_UNCHECKED)
@@ -1259,6 +1265,9 @@ Func SetupAppdata()
 		Case Else
 			;;;
 	EndSelect
+
+	; zh-CN language pack (FileInstall embeds it at compile time)
+	FileInstall("Assets\Langs\0804.lang", @LocalAppDataDir & "\MSEdgeRedirect\Langs\0804.lang", 1)
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
