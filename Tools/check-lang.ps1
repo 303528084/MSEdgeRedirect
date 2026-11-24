@@ -129,7 +129,8 @@ $targets = @(
 
 $seen = New-Object System.Collections.Hashtable ([System.StringComparer]::Ordinal)
 
-foreach ($file in (Get-ChildItem -LiteralPath $root -Recurse -Filter *.au3 -File | Where-Object { $_.Name -ne 'TaskScheduler.au3' })) {
+# 跳过 Au3Stripper 编译产物（它是所有源码合并后的副本，会重复计数）
+foreach ($file in (Get-ChildItem -LiteralPath $root -Recurse -Filter *.au3 -File | Where-Object { $_.Name -ne 'TaskScheduler.au3' -and $_.Name -notlike '*_stripped.au3' })) {
 	$text = Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8
 	# 去掉 #cs ... #ce 注释块，保留行数
 	$text = [regex]::Replace($text, '(?s)#cs\b.*?#ce\b', {
